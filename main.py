@@ -11,13 +11,13 @@ def db_connection():
     try:
         params = config()
 
-        print('Connecting to the PostgreSQL database...')
+        print("Connecting to the PostgreSQL database...")
         conn = psycopg2.connect(**params)
 
         cur = conn.cursor()
 
-        print('PostgreSQL database version:')
-        cur.execute('SELECT version()')
+        print("PostgreSQL database version:")
+        cur.execute("SELECT version()")
 
         db_version = cur.fetchone()
         print(db_version)
@@ -27,21 +27,20 @@ def db_connection():
 
 
 class AutoParser:
-    start_url = 'https://auto.ria.com/car/used/?page={}'
-    url = 'https://auto.ria.com/auto_volkswagen_touareg_32344629.html'
-    url2 = 'https://auto.ria.com/auto_volkswagen_passat_b6_32359160.html'
+    start_url = "https://auto.ria.com/car/used/?page={}"
     text = requests.get(start_url).text
     selector = Selector(text=text)
     LINK = '//head/link[@rel="amphtml"]/@href'
-    TITLE = '//h1/text()'
+    TITLE = "//h1/text()"
     USD_PRICE = "//div[@class='price_value']/strong/text()"
-    MILE_AGE = 'span.size18::text'
-    USERNAME = 'h4.seller_info_name.bold::text'
-    PHONE = 'div.popup-successful-call-desk.size24.bold.green.mhide.green::text'
+    MILE_AGE = "span.size18::text"
+    USERNAME = "h4.seller_info_name.bold::text"
+    PHONE = "div.popup-successful-call-desk.size24.bold.green.mhide.green::text"
     IMAGE_URL = '//div[contains(@class, "carousel-inner")]/div[1]//img/@src'
     TOTAL_IMAGE_COUNT = '//span[@class="count"]/span[@class="mhide"]/text()'
     CAR_NUMBER = '//span[@class="state-num ua"]/text()'
     VIN_CODE = '//span[@class="vin-code"]//text()'
+    ALT_VIN_CODE = "//span[@class='label-vin']//text()"
     all_pages = []
     all_auto_url = []
     ALL_AUTO_URL = '//a[@class="address"]/@href'
@@ -53,7 +52,9 @@ class AutoParser:
         for page in range(1, 21):
             self.all_pages.append(self.start_url.format(page))
             for item in self.all_pages:
-                self.all_auto_url.extend(self.selector.xpath(self.ALL_AUTO_URL).extract())
+                self.all_auto_url.extend(
+                    self.selector.xpath(self.ALL_AUTO_URL).extract()
+                )
 
     def parse_data(self):
         for auto in self.all_auto_url:
@@ -69,16 +70,38 @@ class AutoParser:
             finder_total = new_selector.xpath(self.TOTAL_IMAGE_COUNT).get()
             img_total_count = finder_total[3:]
             car_number = new_selector.xpath(self.CAR_NUMBER).get()
-            vin_code = ''.join(new_selector.xpath(self.VIN_CODE).extract())
-            if vin_code == '':
-                vin_code = ''.join(new_selector.xpath("//span[@class='label-vin']//text()").extract())
+            vin_code = "".join(new_selector.xpath(self.VIN_CODE).extract())
+            if vin_code == "":
+                vin_code = "".join(new_selector.xpath(self.ALT_VIN_CODE).extract())
             date_found = datetime.utcnow()
-            print(link, title, usd_price, mile_age, username, phone_number, img_url, img_total_count, car_number,
-                  vin_code, date_found)
+            print(
+                link,
+                title,
+                usd_price,
+                mile_age,
+                username,
+                phone_number,
+                img_url,
+                img_total_count,
+                car_number,
+                vin_code,
+                date_found,
+            )
             cur.execute(
-                '''INSERT INTO auto (url, title, usd_price, mile_age, username, phone_number, img_url, img_total_count, car_number, car_vin_code) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)''',
-                (link, title, usd_price, mile_age, username, phone_number,
-                 img_url, img_total_count, car_number, vin_code))
+                """INSERT INTO auto (url, title, usd_price, mile_age, username, phone_number, img_url, img_total_count, car_number, car_vin_code) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (
+                    link,
+                    title,
+                    usd_price,
+                    mile_age,
+                    username,
+                    phone_number,
+                    img_url,
+                    img_total_count,
+                    car_number,
+                    vin_code,
+                ),
+            )
             conn.commit()
 
 
