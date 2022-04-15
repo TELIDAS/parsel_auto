@@ -1,35 +1,12 @@
-from parsel import Selector
 import requests
-from datetime import datetime
-from config import config
-import psycopg2
+from parsel import Selector
+from database import Database
 
 
-def db_connection():
-    global cur, conn
-    conn = None
-    try:
-        params = config()
-
-        print("Connecting to the PostgreSQL database...")
-        conn = psycopg2.connect(**params)
-
-        cur = conn.cursor()
-
-        print("PostgreSQL database version:")
-        cur.execute("SELECT version()")
-
-        db_version = cur.fetchone()
-        print(db_version)
-
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(error)
-
-
-class AutoParser:
-    start_url = "https://auto.ria.com/car/used/?page={}"
-    text = requests.get(start_url).text
-    selector = Selector(text=text)
+class AutoRiaScraper:
+    START_URL = "https://auto.ria.com/car/used/?page={}"
+    TEXT = requests.get(START_URL).text
+    SELECTOR = Selector(text=TEXT)
     LINK = '//head/link[@rel="amphtml"]/@href'
     TITLE = "//h1/text()"
     USD_PRICE = "//div[@class='price_value']/strong/text()"
@@ -44,19 +21,21 @@ class AutoParser:
     all_pages = []
     all_auto_url = []
     ALL_AUTO_URL = '//a[@class="address"]/@href'
+    ALLOW_STATUS_CODES = [200]
+    RETRIES = 5
 
     def __init__(self) -> None:
-        pass
+        self.database = Database()
 
-    def get_all_pages(self):
+    def get_all_pages(self) -> None:
         for page in range(1, 21):
-            self.all_pages.append(self.start_url.format(page))
+            self.all_pages.append(self.START_URL.format(page))
             for item in self.all_pages:
                 self.all_auto_url.extend(
-                    self.selector.xpath(self.ALL_AUTO_URL).extract()
+                    self.SELECTOR.xpath(self.ALL_AUTO_URL).extract()
                 )
 
-    def parse_data(self):
+    def parse_data(self) -> None:
         for auto in self.all_auto_url:
             new_text = requests.get(auto).text
             new_selector = Selector(text=new_text)
@@ -73,40 +52,28 @@ class AutoParser:
             vin_code = "".join(new_selector.xpath(self.VIN_CODE).extract())
             if vin_code == "":
                 vin_code = "".join(new_selector.xpath(self.ALT_VIN_CODE).extract())
-            date_found = datetime.utcnow()
-            print(
-                link,
-                title,
-                usd_price,
-                mile_age,
-                username,
-                phone_number,
-                img_url,
-                img_total_count,
-                car_number,
-                vin_code,
-                date_found,
-            )
-            cur.execute(
-                """INSERT INTO auto (url, title, usd_price, mile_age, username, phone_number, img_url, img_total_count, car_number, car_vin_code) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (
-                    link,
-                    title,
-                    usd_price,
-                    mile_age,
-                    username,
-                    phone_number,
-                    img_url,
-                    img_total_count,
-                    car_number,
-                    vin_code,
-                ),
-            )
-            conn.commit()
+
+            data = {
+                "url": link,
+                "title": title,
+                "usd_price": usd_price,
+                "mile_age": mile_age,
+                "username": username,
+                "phone_number": phone_number,
+                "img_url": img_url,
+                "img_total_count": img_total_count,
+                "car_number": car_number,
+                "car_vin_code": vin_code
+            }
+
+            self.database.insert_data(data=data)
+            print(data)
+
+    def main(self) -> None:
+        self.get_all_pages()
+        self.parse_data()
 
 
-if __name__ == "__main__":
-    db_connection()
-    auto = AutoParser()
-    print(auto.get_all_pages())
-    print(auto.parse_data())
+if __name__ == '__main__':
+    scraper = AutoRiaScraper()
+    scraper.main()
