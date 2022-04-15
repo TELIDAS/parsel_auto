@@ -63,7 +63,7 @@ class AutoRiaScraper:
                 "img_url": img_url,
                 "img_total_count": img_total_count,
                 "car_number": car_number,
-                "car_vin_code": vin_code
+                "car_vin_code": vin_code,
             }
 
             self.database.insert_data(data=data)
@@ -74,6 +74,6 @@ class AutoRiaScraper:
         self.parse_data()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     scraper = AutoRiaScraper()
     scraper.main()
